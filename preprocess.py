@@ -17,39 +17,82 @@ import contextily as cx
 import numpy as np
 
 
+#the city under consideration, if following the methods from the paper:
+cityName='Atlanta'
+#city boundaries:
+#for example, here is the bounding box which includes the I-285 interstate, which circles Atlanta
+# used by the functions called for matrix manipulation   
+maxlongitude=-84.227909
+minlongitude=-84.505798
+maxlatitude=33.923198
+minlatitude=33.613440
+
+
+cityName='Denver' 
+maxlongitude=-104.728302
+minlongitude=-105.232186
+maxlatitude=39.972504
+minlatitude=39.555531
+
 
 class Main():     
 
     def __init__(self):
 
         #main files:
-        #commuter info downloaded from LODES, unchanged. 
-        self.csvfile = "ga_od_main_JT00_2020.csv"
-        #customer info, with location data & some names for convenience
-        self.custfile='AtlCustomers.csv' #origin ID, dest ID, # commuters traveling between them, info on districts
-        #station info, made from the tract locations
-        self.statfile='AtlStations.csv' #station ID, location
-        #every valid pair of station & commuter; the function that creates this will 
-        #save it to this location; other functions will read this file
-        self.pairfile='AtlPairs.csv' #customer ID, station ID, distance
 
-        #parameters, set to recommended values:
+        #commuter info downloaded from LODES, unzipped. 
+        #specifically, [state]_od_main_JT00_[year].csv
+        self.csvfile = "co_od_main_JT00_2020.csv"
+
+        #the crosswalk file given with the LODES data
+        self.xwalk="co_xwalk.csv"
+
+        #customer info, with location data & some names for convenience
+        #if running preprocess(), this is the place where it will be saved
+        self.custfile='COCustomers.csv' #origin ID, dest ID, # commuters traveling between them, info on districts
+
+        #station info, made from the tract locations
+        #if running preprocess(), this is the place where it will be saved
+        self.statfile='COStations.csv' #station ID, location
+
+        #every valid pair of station & commuter; the function that creates this will 
+        #if running preprocess(), this is the place where it will be saved
+        self.pairfile='COPairs.csv' #customer ID, station ID, distance
+
+
+        #parameters, preset here to recommended values:
+
         #set this to True if working with smaller dataset as test set:
         #only commuters who both live and work inside the perimeter are included
         self.bitesize=False 
+
         #if true, aggregate to tracts from blocks, and use tracks
         #whenever relevant; otherwise solve in blocks
         self.aggregate=True 
 
         #additional inputs:
-        self.homefile='GAFPL2018.csv' #home statistics
+        #(only for Atlanta)
+        self.homefile='GAFPL2018.csv' #home statistics 
+
+        
+
+
+    def preprocess(self):
+        #creates all three files (commuter information ('custfile'), station information ('statfile'), and pairwise distances ('pairfile'))
+        #saves to locations in __init__
+        self.write_data()
+        pairs=self.format_pair()
+        pairs.to_csv(self.pairfile)
 
     def write_data(self):
-        #the main function you will want--
+        #preprocessing without home charging information, and without creating pairfile
+
         #filters LODES data into relevant commuter data, and, if self.aggregate,
         #also aggregates these into census tracts from blocks
         cust=self.format_cust()
         cust.to_csv(self.custfile)
+
         #uses self.custfile to create a list of potential station locations with IDs and 
         #lat/long locations
         stat=self.format_stat
@@ -119,12 +162,12 @@ class Main():
         #distance between origin and destination
         odframe['Travel Distance'] = odframe.apply(td,axis=1)
         #is origin OR destination in ATL? (the set of data used in the paper)
-        odframe['Atlanta']=odframe.apply(bigAtl,axis=1)
+        odframe[cityName]=odframe.apply(bigCity,axis=1)
         #are origin AND destination in ATl? (a smaller set for testing)
-        odframe['Small Set']=odframe.apply(smallAtl,axis=1)
+        odframe['Small Set']=odframe.apply(smallCity,axis=1)
         
         if True: #output ONLY Atl (paper) data
-            odframe=odframe.loc[odframe['Atlanta']==1]
+            odframe=odframe.loc[odframe[cityName]==1]
         if self.bitesize: #output ONLY small testing data
             odframe=odframe.loc[odframe['Small Set']==1]
         
@@ -142,10 +185,10 @@ class Main():
         
         
         if True: #output only stations near Atl
-            stations['Atlanta']=stations.apply(nearAtl,axis=1)
-            stations=stations.loc[stations['Atlanta']==1]
+            stations[cityName]=stations.apply(nearCity,axis=1)
+            stations=stations.loc[stations[cityName]==1]
         else: #output all stations w/ additional binary column =1 if in Atl
-            stations['Atlanta']=stations.apply(statAtl,axis=1)
+            stations[City]=stations.apply(statCity,axis=1)
         
         return stations
 
@@ -178,8 +221,7 @@ class Main():
         cols=cols+['stwibname','blklondd','blklatdd','ctyname']
         
         #file with geodata for census tracts
-        xwalk = "ga_xwalk.csv"
-        districts = pd.read_csv(xwalk, usecols=cols)
+        districts = pd.read_csv(self.xwalk, usecols=cols)
 
         #rename columns before merging for clarity
         mapp=dict()
@@ -331,26 +373,18 @@ def lldist(lat1, long1, lat2, long2):
 
     return arc
 
-def statAtl( row ):
+def statCity( row ):
     #simple function: is a given station (in a dataframe with correct col names) in Atl? 0/1
     olon=row['Station Longitude']
     olat=row['Station Latitude']
   
-    return inAtl(olat,olon)
+    return inCity(olat,olon)
     
 
-def inAtl(lat,lon):
-    #is a given latitude/longitude pair inside the I-285 perimeter rectangle? 0/1
-    lonmin=-84.505798
-    lonmax=-84.227909
-    latmax=33.923198
-    latmin=33.613440
-    '''
-    latmax=33.786307
-    lonmin=-84.411681
-    latmin=33.740897
-    lonmax=-84.379394'''
-    if lat>=latmin and lat <= latmax and lon >= lonmin and lon <= lonmax:
+def inCity(lat,lon):
+    #is a given latitude/longitude pair inside the city perimeter rectangle? 0/1
+
+    if lat>=minlatitude and lat <= maxlatitude and lon >= minlongitude and lon <= maxlongitude:
         return 1
     else:
         return 0
@@ -368,28 +402,28 @@ def td( row ):
     td=2*td+5
     return td
 
-def bigAtl( row ):
-    #is a commuter's home or work location in Atl? 0/1
+def bigCity( row ):
+    #is a commuter's home or work location in the city? 0/1
     #given the commuter's row in a dataframe
     olon=row['Home Longitude']
     olat=row['Home Latitude']
     dlon=row['Work Longitude']
     dlat=row['Work Latitude']
   
-    if inAtl(olat,olon)==1 or inAtl(dlat,dlon)==1:
+    if inCity(olat,olon)==1 or inCity(dlat,dlon)==1:
         return 1
     else:
         return 0
 
-def smallAtl( row ):
-    #are a commuter's home and work locations both in Atl? 0/1
+def smallCity( row ):
+    #are a commuter's home and work locations both in the city? 0/1
     #given the associated row in a dataframe
     olon=row['Home Longitude']
     olat=row['Home Latitude']
     dlon=row['Work Longitude']
     dlat=row['Work Latitude']
   
-    if inAtl(olat,olon)==1 and inAtl(dlat,dlon)==1:
+    if inCity(olat,olon)==1 and inCity(dlat,dlon)==1:
         return 1
     else:
         return 0
@@ -411,10 +445,10 @@ def pairDist(row):
     d=math.ceil(d)
     return d
 
-def nearAtl(row):
-    #is a station near the centerpoint of the I-285 perimeter? 0/1
-    alat=33.769849341009376
-    alon=-84.3899233590007
+def nearCity(row):
+    #is a station near the centerpoint of the city
+    alat=(maxlatitude+minlatitude)/2
+    alon=(minlongitude+maxlongitude)/2
     slon=row['Station Longitude']
     slat=row['Station Latitude']
     d=lldist(alat, alon, slat, slon)
@@ -425,5 +459,4 @@ def nearAtl(row):
     
     
 main=Main()
-hcdf=main.home_charging()
-hcdf.to_csv(main.custout)
+main.preprocess()
