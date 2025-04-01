@@ -95,7 +95,9 @@ class Main():
         if self.eqconstr>0: #home id for equity reference
             cols=['Customer ID','Commuters', 'Travel Distance','Commuters w/o Level 1','Home ID']
         else:
-            cols=['Customer ID','Commuters', 'Travel Distance','Commuters w/o Level 1']
+            cols=['Customer ID','Commuters', 'Travel Distance']
+            if self.hc:
+                cols=cols+['Commuters w/o Level 1']
         custs= pd.read_csv(self.custfile, usecols=cols) 
 
         #o-d numbers of commuters
@@ -141,7 +143,7 @@ class Main():
                     a=custs.loc[custs['Customer ID']==i]['Travel Distance']
                     a=a.tolist()
                     
-                    td[i]=a[0]
+                    td[i]=a[0]+23
                 m.addConstr( (quicksum(td[i]*x[i][j] for i in sj)) <= z[j]*mm)
                 del td
           
@@ -259,3 +261,17 @@ m=main.ip(False, version = 2)
 #print optimal value
 print(m)'''
 
+main=Main()
+#here we can change parameters
+main.B=4115
+main.eqconstr=0
+main.custfile='COCustomers.csv'
+main.statfile='COStations.csv'
+main.pairfile='COPairs.csv'
+main.xfile='COModel2x.csv'
+main.zfile='COModel2z.csv'
+main.hc=False
+#run model and output results into m.xfile,m.zfile
+m=main.ip(False, version = 2)
+#print optimal value
+print(m)

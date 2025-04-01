@@ -95,7 +95,7 @@ class Main():
 
         #uses self.custfile to create a list of potential station locations with IDs and 
         #lat/long locations
-        stat=self.format_stat
+        stat=self.format_stat()
         stat.to_csv(self.statfile)
         #there is one more file that the optimization will require, here referred to mostly as 
         #pairfile, but it requires a fair bit of ram as written; 
@@ -111,11 +111,13 @@ class Main():
         #latitude/longitudes of the centroids of the component blocks
 
         #read & hold origin and destination info
-        origins=self.format_districts(orig=True)
+        origins=self.format_districts(orig=True)     
         dests=self.format_districts(orig=False)
 
+
         #file with origin-destination commuter data
-        csvframe=pd.read_csv(self.csvfile)
+        cols=['w_geocode','h_geocode','S000']
+        csvframe=pd.read_csv(self.csvfile, usecols=cols,dtype={'w_geocode':str,'h_geocode':str})
         
         #origin, destination, and tot. num. commuters
         csvframe=csvframe[['w_geocode','h_geocode','S000']]
@@ -130,16 +132,13 @@ class Main():
         if self.aggregate:
 
             #change to tract id; set as string for concatenation
-            csvframe['Home ID'] = csvframe['Home ID'].astype(str)
             csvframe['Home ID'] = csvframe['Home ID'].str[0:11] 
-            csvframe['Work ID'] = csvframe['Work ID'].astype(str)
             csvframe['Work ID'] = csvframe['Work ID'].str[0:11]
 
             #combined label for origin and destination as a string
             csvframe['OrigDest'] = csvframe['Home ID']+csvframe['Work ID']
-            #put back the ids as integers
-            csvframe['Home ID'] = csvframe['Home ID'].astype('int64')
-            csvframe['Work ID'] = csvframe['Work ID'].astype('int64')
+
+
 
             #sum over tract ids
             commutes=csvframe[['OrigDest','Commuters']].groupby(['OrigDest']).sum()
@@ -150,7 +149,10 @@ class Main():
             csvframe=commutes.merge(csvframe,on='OrigDest',how='inner')
             del commutes
         
+
         #add info on orig and destination tracts/blocks
+        print(origins.head())
+        print(csvframe.head())
         odframe=origins.merge(csvframe,on='Home ID',how='inner')
         del csvframe
         odframe=dests.merge(odframe,on='Work ID',how='inner')
@@ -215,13 +217,17 @@ class Main():
         #aggregate--use tract info; else use block info
         if self.aggregate:
             cols=['trct']
+            tdict={'trct':str}
         else:
             cols=['tabblk2020']
+            tdict={'tabblk2020':str}
+
         #name for tract location, long and lat, name of county
         cols=cols+['stwibname','blklondd','blklatdd','ctyname']
         
         #file with geodata for census tracts
-        districts = pd.read_csv(self.xwalk, usecols=cols)
+        districts = pd.read_csv(self.xwalk, usecols=cols,dtype=tdict)
+
 
         #rename columns before merging for clarity
         mapp=dict()
@@ -237,15 +243,19 @@ class Main():
         mapp['ctyname']=cty
         districts=districts.rename(columns=mapp)
         districts=districts[names]
-        districts[ID]=districts[ID].astype('int64')
 
         #aggregation into tracts
         if self.aggregate:
-            districts[ID] = districts[ID].astype(str)
-            districts[ID]=districts[ID].str[0:11]
-            districts[ID] = districts[ID].astype('int64')
-            districts=districts.groupby(ID).mean()
+            #str info (trct id, countyname, area name)
+            miscinfo=districts[[ID,sd,cty]]
+            miscinfo=miscinfo.drop_duplicates(subset=[ID])
+
+            #average to get new 'center' of tract 
+            districts=districts[[ID,x,y]].groupby(ID).mean()
             districts=pd.DataFrame(districts)
+
+            #add back in str info
+            districts=districts.merge(miscinfo,on=ID)
             
         return districts
     
@@ -390,17 +400,19 @@ def inCity(lat,lon):
         return 0
 
 def td( row ):
-    #calculates the min distance between a station and a commuter's work and home locations 
+    #calculates distance a commuter travels round-trip
     #from a dataframe row with correct column names
+    #does NOT add any additional travel distance
     ox=row['Home Longitude']
     oy=row['Home Latitude']
     dx=row['Work Longitude']
     dy=row['Work Latitude']
   
-    td=abs(lldist(oy,ox,dy,dx))
-    td=math.ceil(td)
-    td=2*td+5
-    return td
+    toreturn=abs(lldist(oy,ox,dy,dx))
+    toreturn=2*toreturn
+    toreturn=math.ceil(toreturn)
+
+    return toreturn
 
 def bigCity( row ):
     #is a commuter's home or work location in the city? 0/1
