@@ -27,14 +27,6 @@ minlongitude=-84.505798
 maxlatitude=33.923198
 minlatitude=33.613440
 
-
-cityName='Denver' 
-maxlongitude=-104.728302
-minlongitude=-105.232186
-maxlatitude=39.972504
-minlatitude=39.555531
-
-
 class Main():     
 
     def __init__(self):
@@ -43,22 +35,22 @@ class Main():
 
         #commuter info downloaded from LODES, unzipped. 
         #specifically, [state]_od_main_JT00_[year].csv
-        self.csvfile = "co_od_main_JT00_2020.csv"
+        self.csvfile = "ga_od_main_JT00_2020.csv"
 
         #the crosswalk file given with the LODES data
-        self.xwalk="co_xwalk.csv"
+        self.xwalk="ga_xwalk.csv"
 
         #customer info, with location data & some names for convenience
         #if running preprocess(), this is the place where it will be saved
-        self.custfile='COCustomers.csv' #origin ID, dest ID, # commuters traveling between them, info on districts
+        self.custfile='customers.csv' #origin ID, dest ID, # commuters traveling between them, info on districts
 
         #station info, made from the tract locations
         #if running preprocess(), this is the place where it will be saved
-        self.statfile='COStations.csv' #station ID, location
+        self.statfile='stations.csv' #station ID, location
 
         #every valid pair of station & commuter; the function that creates this will 
         #if running preprocess(), this is the place where it will be saved
-        self.pairfile='COPairs.csv' #customer ID, station ID, distance
+        self.pairfile='pairs.csv' #customer ID, station ID, distance
 
 
         #parameters, preset here to recommended values:
@@ -75,9 +67,6 @@ class Main():
         #(only for Atlanta)
         self.homefile='GAFPL2018.csv' #home statistics 
 
-        
-
-
     def preprocess(self):
         #creates all three files (commuter information ('custfile'), station information ('statfile'), and pairwise distances ('pairfile'))
         #saves to locations in __init__
@@ -85,12 +74,36 @@ class Main():
         pairs=self.format_pair()
         pairs.to_csv(self.pairfile)
 
-    def write_data(self):
+    def write_data(self, doFilter=True):
         #preprocessing without home charging information, and without creating pairfile
 
         #filters LODES data into relevant commuter data, and, if self.aggregate,
         #also aggregates these into census tracts from blocks
         cust=self.format_cust()
+
+        if doFilter:
+            #calculate average and standard deviation of travel distance
+            temp=cust[['Travel Distance','Commuters']]
+            temp['Weighted']=temp['Commuters']*temp['Travel Distance']
+
+            totc=temp['Commuters'].sum()   
+            avgd=temp['Weighted'].sum()/totc
+
+            temp['SD']=temp['Travel Distance']-avgd
+            temp['SD']=temp['SD'] ** 2
+            temp['SD']=temp['SD']*temp['Commuters']
+            
+            sd=temp['SD'].sum()
+            sd=sd/totc
+            sd=math.sqrt(sd)
+            print(sd)
+            print(avgd)
+            del temp
+
+            #remove all commuters who travel more than 2 standard deviations + average distance
+            bound=avgd + (2*sd)
+            cust=cust.loc[cust['Travel Distance'] <= bound]
+
         cust.to_csv(self.custfile)
 
         #uses self.custfile to create a list of potential station locations with IDs and 
@@ -472,3 +485,7 @@ def nearCity(row):
     
 main=Main()
 main.preprocess()
+
+
+pairs=main.format_pair()
+pairs.to_csv(main.pairfile)

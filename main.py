@@ -120,32 +120,33 @@ class Main():
             x[i]=dict()
             S=pairs.loc[pairs['Customer ID']==i]
             for index, row in S.iterrows():
-                x[i][row['Station ID']] =m.addVar(name='x_'+str(i)+str(row['Station ID']))        
+                x[i][row['Station ID']] =m.addVar(name='x_'+str(i)+'_'+str(row['Station ID']))        
         
         #zj: # chargers opened at location j
         z = dict()
         for j in stations:
-            z[j]=m.addVar(name='z_'+str(j),vtype=GRB.INTEGER)
+            z[j]=m.addVar(name='z_'+str(j),vtype=GRB.INTEGER,ub=100)
     
         #each charger is assigned at most mm customers
         mm=250*6*1 #num customer miles a single charger can serve:
             #250 miles per charge
             #1 hr to charge to full
             #18 hours-ish each station runs
+
+        td=dict()
+        for i in customers:
+            a=custs.loc[custs['Customer ID']==i]['Travel Distance']
+            a=a.tolist()
+                    
+            td[i]=a[0]+23
             
         #stations can charge at most mm * num chargers miles
         for j in stations:
             temp=pairs.loc[pairs['Station ID']==j]
             sj=temp['Customer ID'].unique().tolist()
-            if len(sj)>0:
-                td=dict()
-                for i in sj:
-                    a=custs.loc[custs['Customer ID']==i]['Travel Distance']
-                    a=a.tolist()
-                    
-                    td[i]=a[0]+23
+            if len(sj)>0:    
                 m.addConstr( (quicksum(td[i]*x[i][j] for i in sj)) <= z[j]*mm)
-                del td
+                
           
         #at most B stations created
         if version == 1:
@@ -270,7 +271,15 @@ main.statfile='COStations.csv'
 main.pairfile='COPairs.csv'
 main.xfile='COModel2x.csv'
 main.zfile='COModel2z.csv'
+
+
+main.custfile='customers.csv'
+main.statfile='stations.csv'
+main.pairfile='pairs.csv'
+main.xfile='model2-doublecheck-x-ub.csv'
+main.zfile='model2-doublecheck-z-ub.csv'
 main.hc=False
+main.B=10000
 #run model and output results into m.xfile,m.zfile
 m=main.ip(False, version = 2)
 #print optimal value
