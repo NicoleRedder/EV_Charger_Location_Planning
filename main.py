@@ -54,7 +54,7 @@ class Main():
         #'Home ID' can be ommitted if not using equity constraints (self.eqconstr==0)
         #my custfile also includes latitude/longitude and name data for both 'work' and 'home', which 
         #may be useful for analysis of results
-        self.custfile='customers.csv'
+        self.custfile='commuters.csv'
         #columns required: 'ID' --station ids for all viable station locations
         #my statfile also includes latitude/longitude information, which may be useful for analysis
         self.statfile='stations.csv'
@@ -87,17 +87,19 @@ class Main():
         # 0: do not add
         # 1: at least 40% of stations are placed in disadvantaged areas
         # 2: at least 40% of customers served are disadvantaged  
+        # 3: 2, with the binary logic that, if all disadvantaged commuters are served, the percentage need not apply
         
         
         #read necessary data
 
         #commuters w/o o-d numbers
+        cols=['Customer ID','Commuters', 'Travel Distance']
+
         if self.eqconstr>0: #home id for equity reference
-            cols=['Customer ID','Commuters', 'Travel Distance','Commuters w/o Level 1','Home ID']
-        else:
-            cols=['Customer ID','Commuters', 'Travel Distance']
-            if self.hc:
-                cols=cols+['Commuters w/o Level 1']
+            cols=cols+['Home ID']            
+        if self.hc: #home charging info
+            cols=cols+['Commuters w/o Level 1']
+
         custs= pd.read_csv(self.custfile, usecols=cols) 
 
         #o-d numbers of commuters
@@ -180,10 +182,13 @@ class Main():
             df=pd.read_csv(self.eqfile,usecols=cols)
 
             if self.eqconstr==1:
+
+                sdf=pd.read_csv(self.statfile,usecols=['ID','Station ID'])
                 df.rename(columns={'2020 ID':'Station ID'}, inplace = True)
+                df=df.merge(sdf,on='Station ID')
                 dStations=dict()
                 for j in stations:
-                    disad=df[df['Station ID']==j]['Disadvantaged'].iloc[0]
+                    disad=df[df['ID']==j]['Disadvantaged'].iloc[0]
                     if disad:
                         dStations[j]=1
                     else:
@@ -191,17 +196,30 @@ class Main():
                 #at least 40% of stations must be in disadvantaged tracts
                 m.addConstr( (quicksum(z[j]*dStations[j] for j in stations)) >= 0.4*(quicksum(z[j] for j in stations)))
             
-            elif self.eqconstr==2: #at least 40% of commuters served must live in disadvantaged tracts
+            elif self.eqconstr in [2,3]: #at least 40% of commuters served must live in disadvantaged tracts
                 df.rename(columns={'2020 ID':'Home ID'}, inplace = True)
                 dCust=dict()
                 df=custs.merge(df,on='Home ID',how='left')
+                c_d = 0
+                c_t = 0
                 for i in customers:
                     disad=df[df['Customer ID']==i]['Disadvantaged'].iloc[0]
+                    commutes=df[df['Customer ID']==i]['Commuters'].iloc[0]
                     if disad:
                         dCust[i]=1
+                        c_d=c_d+commutes
+                        c_t=c_t+commutes
                     else:
                         dCust[i]=0
-                m.addConstr( (quicksum( (quicksum(x[i][j]*dCust[i] for j in x[i].keys())) for i in customers))>= 0.4*(quicksum( (quicksum(x[i][j] for j in x[i].keys())) for i in customers)))
+                        c_t=c_t+commutes
+                if self.eqconstr==2:
+                    m.addConstr( (quicksum( (quicksum(x[i][j]*dCust[i] for j in x[i].keys())) for i in customers))>= 0.4*(quicksum( (quicksum(x[i][j] for j in x[i].keys())) for i in customers)))
+                if self.eqconstr==3:
+                    y=m.addVar(vtype=GRB.BINARY,name='y')
+                    m.addConstr( (quicksum( (quicksum(x[i][j]*dCust[i] for j in x[i].keys())) for i in customers)) + (0.4*c_t * y)>= 0.4*(quicksum( (quicksum(x[i][j] for j in x[i].keys())) for i in customers)))
+                    m.addConstr( (quicksum( (quicksum(x[i][j]*dCust[i] for j in x[i].keys())) for i in customers))>= 0.4*c_d*y)
+            
+
             del df
         
         #maximize customers served
@@ -262,6 +280,7 @@ m=main.ip(False, version = 2)
 #print optimal value
 print(m)'''
 
+
 main=Main()
 #here we can change parameters
 main.B=4115
@@ -272,15 +291,39 @@ main.pairfile='COPairs.csv'
 main.xfile='COModel2x.csv'
 main.zfile='COModel2z.csv'
 
-
-main.custfile='customers.csv'
-main.statfile='stations.csv'
-main.pairfile='pairs.csv'
-main.xfile='model2-doublecheck-x-ub.csv'
-main.zfile='model2-doublecheck-z-ub.csv'
 main.hc=False
 main.B=10000
 #run model and output results into m.xfile,m.zfile
 m=main.ip(False, version = 2)
 #print optimal value
 print(m)
+
+
+
+
+
+'''
+main=Main()
+
+Bs=range(1000,11001,1000)
+Bs=[0]
+eq=0
+homecharge=False
+obj=2
+main.custfile='commuters.csv'
+main.statfile='stations.csv'
+main.pairfile='pairs.csv'
+
+for b in Bs:
+    for eq in [0]:
+        print('B='+str(b))
+        print('eq: '+str(eq))
+        main.B=b
+        main.hc=homecharge
+        main.eqconstr=eq
+        prefix='model'+str(obj)+'-B'+str(b)+'-hc'+str(homecharge)+'-eq'+str(eq)
+        main.xfile=prefix+'-x.csv'
+        main.zfile=prefix+'-z.csv'
+        m=main.ip(False,version=obj)
+        print(m)
+'''

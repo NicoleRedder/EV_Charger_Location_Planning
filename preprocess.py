@@ -348,7 +348,7 @@ class Main():
         df.rename(columns={'FIP':'Home ID'}, inplace = True)
 
         #combine with original cust file
-        cdf=pd.read_csv(self.custin)
+        cdf=pd.read_csv(self.custfile)
         cdf=cdf.merge(df,on='Home ID',how='left')
 
         #if no data, make sure it's nan (some are 0s)
@@ -482,10 +482,17 @@ def nearCity(row):
     else:
         return 1
     
-    
+
+'''    
 main=Main()
 main.preprocess()
 
 
 pairs=main.format_pair()
 pairs.to_csv(main.pairfile)
+'''
+
+
+main=Main()
+df=main.home_charging()
+df.to_csv('commuters.csv')
