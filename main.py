@@ -72,7 +72,7 @@ class Main():
         self.xfile='AtlX-2sd-model2.csv'
         
     
-    def ip(self, justModel=True, version=2):
+    def ip(self, justModel=True, version=2, z_ub=100):
         #justModel: output created gurobipy model, do not run
         #False: run model and save data to file instead
 
@@ -127,7 +127,7 @@ class Main():
         #zj: # chargers opened at location j
         z = dict()
         for j in stations:
-            z[j]=m.addVar(name='z_'+str(j),vtype=GRB.INTEGER,ub=100)
+            z[j]=m.addVar(name='z_'+str(j),vtype=GRB.INTEGER,ub=z_ub)
     
         #each charger is assigned at most mm customers
         mm=250*6*1 #num customer miles a single charger can serve:
@@ -281,49 +281,17 @@ m=main.ip(False, version = 2)
 print(m)'''
 
 
-main=Main()
-#here we can change parameters
-main.B=4115
-main.eqconstr=0
-main.custfile='COCustomers.csv'
-main.statfile='COStations.csv'
-main.pairfile='COPairs.csv'
-main.xfile='COModel2x.csv'
-main.zfile='COModel2z.csv'
 
+
+main=Main()
+
+main.eqconstr=0
+main.xfile='model2-noUB-x.csv'
+main.zfile='model2-noUB-z.csv'
 main.hc=False
-main.B=10000
+
 #run model and output results into m.xfile,m.zfile
-m=main.ip(False, version = 2)
+m=main.ip(False, version = 2,z_ub=1000)
 #print optimal value
 print(m)
 
-
-
-
-
-'''
-main=Main()
-
-Bs=range(1000,11001,1000)
-Bs=[0]
-eq=0
-homecharge=False
-obj=2
-main.custfile='commuters.csv'
-main.statfile='stations.csv'
-main.pairfile='pairs.csv'
-
-for b in Bs:
-    for eq in [0]:
-        print('B='+str(b))
-        print('eq: '+str(eq))
-        main.B=b
-        main.hc=homecharge
-        main.eqconstr=eq
-        prefix='model'+str(obj)+'-B'+str(b)+'-hc'+str(homecharge)+'-eq'+str(eq)
-        main.xfile=prefix+'-x.csv'
-        main.zfile=prefix+'-z.csv'
-        m=main.ip(False,version=obj)
-        print(m)
-'''

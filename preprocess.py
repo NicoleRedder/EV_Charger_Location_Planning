@@ -27,6 +27,18 @@ minlongitude=-84.505798
 maxlatitude=33.923198
 minlatitude=33.613440
 
+cityName='Portland'
+#city boundaries:
+#for example, here is the bounding box which includes the I-285 interstate, which circles Atlanta
+# used by the functions called for matrix manipulation   
+maxlongitude=-122.495820
+minlongitude=-122.751939
+maxlatitude=45.636901
+minlatitude=45.457054
+ 
+
+
+
 class Main():     
 
     def __init__(self):
@@ -35,22 +47,22 @@ class Main():
 
         #commuter info downloaded from LODES, unzipped. 
         #specifically, [state]_od_main_JT00_[year].csv
-        self.csvfile = "ga_od_main_JT00_2020.csv"
+        self.csvfile = "or_od_main_JT00_2020.csv"
 
         #the crosswalk file given with the LODES data
-        self.xwalk="ga_xwalk.csv"
+        self.xwalk="or_xwalk.csv"
 
         #customer info, with location data & some names for convenience
         #if running preprocess(), this is the place where it will be saved
-        self.custfile='customers.csv' #origin ID, dest ID, # commuters traveling between them, info on districts
+        self.custfile='orCustomers-30mi.csv' #origin ID, dest ID, # commuters traveling between them, info on districts
 
         #station info, made from the tract locations
         #if running preprocess(), this is the place where it will be saved
-        self.statfile='stations.csv' #station ID, location
+        self.statfile='orStations-30mi.csv' #station ID, location
 
         #every valid pair of station & commuter; the function that creates this will 
         #if running preprocess(), this is the place where it will be saved
-        self.pairfile='pairs.csv' #customer ID, station ID, distance
+        self.pairfile='orPairs-30mi.csv' #customer ID, station ID, distance
 
 
         #parameters, preset here to recommended values:
@@ -84,6 +96,7 @@ class Main():
         if doFilter:
             #calculate average and standard deviation of travel distance
             temp=cust[['Travel Distance','Commuters']]
+            temp=temp.copy()
             temp['Weighted']=temp['Commuters']*temp['Travel Distance']
 
             totc=temp['Commuters'].sum()   
@@ -96,12 +109,14 @@ class Main():
             sd=temp['SD'].sum()
             sd=sd/totc
             sd=math.sqrt(sd)
-            print(sd)
+            print('Average commute distance:')
             print(avgd)
+            print('Standard deviation:')
+            print(sd)
             del temp
 
             #remove all commuters who travel more than 2 standard deviations + average distance
-            bound=avgd + (2*sd)
+            bound=avgd + (1*sd)
             cust=cust.loc[cust['Travel Distance'] <= bound]
 
         cust.to_csv(self.custfile)
@@ -164,8 +179,6 @@ class Main():
         
 
         #add info on orig and destination tracts/blocks
-        print(origins.head())
-        print(csvframe.head())
         odframe=origins.merge(csvframe,on='Home ID',how='inner')
         del csvframe
         odframe=dests.merge(odframe,on='Work ID',how='inner')
@@ -477,22 +490,19 @@ def nearCity(row):
     slon=row['Station Longitude']
     slat=row['Station Latitude']
     d=lldist(alat, alon, slat, slon)
-    if d>50:
+    if d>30:
         return 0
     else:
         return 1
     
 
-'''    
+    
 main=Main()
+
 main.preprocess()
-
-
 pairs=main.format_pair()
 pairs.to_csv(main.pairfile)
-'''
 
 
-main=Main()
-df=main.home_charging()
-df.to_csv('commuters.csv')
+
+
