@@ -27,17 +27,6 @@ minlongitude=-84.505798
 maxlatitude=33.923198
 minlatitude=33.613440
 
-cityName='Portland'
-#city boundaries:
-#for example, here is the bounding box which includes the I-285 interstate, which circles Atlanta
-# used by the functions called for matrix manipulation   
-maxlongitude=-122.495820
-minlongitude=-122.751939
-maxlatitude=45.636901
-minlatitude=45.457054
- 
-
-
 
 class Main():     
 
@@ -47,22 +36,22 @@ class Main():
 
         #commuter info downloaded from LODES, unzipped. 
         #specifically, [state]_od_main_JT00_[year].csv
-        self.csvfile = "or_od_main_JT00_2020.csv"
+        self.csvfile = "ga_od_main_JT00_2020.csv"
 
         #the crosswalk file given with the LODES data
-        self.xwalk="or_xwalk.csv"
+        self.xwalk="ga_xwalk.csv"
 
         #customer info, with location data & some names for convenience
         #if running preprocess(), this is the place where it will be saved
-        self.custfile='orCustomers-30mi.csv' #origin ID, dest ID, # commuters traveling between them, info on districts
+        self.custfile='commuters.csv' #origin ID, dest ID, # commuters traveling between them, info on districts
 
         #station info, made from the tract locations
         #if running preprocess(), this is the place where it will be saved
-        self.statfile='orStations-30mi.csv' #station ID, location
+        self.statfile='stations.csv' #station ID, location
 
         #every valid pair of station & commuter; the function that creates this will 
         #if running preprocess(), this is the place where it will be saved
-        self.pairfile='orPairs-30mi.csv' #customer ID, station ID, distance
+        self.pairfile='pairs.csv' #customer ID, station ID, distance
 
 
         #parameters, preset here to recommended values:
@@ -498,10 +487,13 @@ def nearCity(row):
 
     
 main=Main()
+main.custfile='tempcust.csv'
+main.pairfile='temppair.csv'
+main.statfile='temptstat.csv'
 
 main.preprocess()
-pairs=main.format_pair()
-pairs.to_csv(main.pairfile)
+#pairs=main.format_pair()
+#pairs.to_csv(main.pairfile)
 
 
 

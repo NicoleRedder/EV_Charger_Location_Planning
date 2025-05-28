@@ -67,9 +67,9 @@ class Main():
 
         #default output files:
         #station placements
-        self.zfile='AtlZ-2sd-model2.csv'
+        self.zfile='temp-z.csv'
         #commuter assignments
-        self.xfile='AtlX-2sd-model2.csv'
+        self.xfile='temp-x.csv'
         
     
     def ip(self, justModel=True, version=2, z_ub=100):
@@ -279,19 +279,4 @@ main.eqconstr=0
 m=main.ip(False, version = 2)
 #print optimal value
 print(m)'''
-
-
-
-
-main=Main()
-
-main.eqconstr=0
-main.xfile='model2-noUB-x.csv'
-main.zfile='model2-noUB-z.csv'
-main.hc=False
-
-#run model and output results into m.xfile,m.zfile
-m=main.ip(False, version = 2,z_ub=1000)
-#print optimal value
-print(m)
 
